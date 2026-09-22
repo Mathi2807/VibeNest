@@ -240,7 +240,12 @@ async function fetchStories(){
   const r=await supabase.from("stories").select("*").order("created_at",{ascending:false}).limit(80);
   if(r.error)return{stories:[],profiles:[]};
   const active=(r.data||[]).filter(s=>new Date(s.expires_at)>new Date());
-  return{stories:active,profiles:await profilesByIds(active.map(s=>s.user_id))};
+  const profiles=await profilesByIds(active.map(s=>s.user_id));
+  const map=Object.fromEntries(profiles.map(p=>[p.id,p]));
+  const f=await supabase.from("follows").select("following_id").eq("follower_id",session.user.id);
+  const following=new Set((f.data||[]).map(x=>x.following_id));
+  const visible=active.filter(s=>s.user_id===session.user.id||map[s.user_id]?.profile_visibility!=="private"||following.has(s.user_id));
+  return{stories:visible,profiles:profiles.filter(p=>visible.some(s=>s.user_id===p.id))};
 }
 
 function composer(){
@@ -250,11 +255,8 @@ function composer(){
 async function renderFeed(){
   const c=$("#content");
   const stories=await fetchStories();
-  let followingIds=[];
-  if(feedMode==="following"){
-    const f=await supabase.from("follows").select("following_id").eq("follower_id",session.user.id);
-    followingIds=(f.data||[]).map(x=>x.following_id);
-  }
+  const followRes=await supabase.from("follows").select("following_id").eq("follower_id",session.user.id);
+  const followingIds=(followRes.data||[]).map(x=>x.following_id);
   let query=supabase.from("posts").select("*").order("created_at",{ascending:false}).limit(70);
   if(feedMode==="following")query=followingIds.length?query.in("user_id",[session.user.id,...followingIds]):query.eq("user_id",session.user.id);
   const r=await query;
@@ -609,7 +611,7 @@ async function searchEverything(query){
   const users=[...userMap.values()].filter(p=>p.id===session.user.id||p.profile_visibility!=="private");
   const meta=await loadPostMeta((posts.data||[]).map(p=>p.id)),postProfiles=await profilesByIds((posts.data||[]).map(p=>p.user_id));
   const userHtml=users.map(p=>'<div class="result-row">'+avatar(p,true)+'<div><button class="plain-link" data-profile="'+p.id+'">'+esc(p.display_name)+'</button><small>@'+esc(p.username)+'</small></div><span class="spacer"></span><button class="secondary-btn" data-profile="'+p.id+'">Ver</button></div>').join("")||'<div class="empty compact">No se encontraron personas.</div>';
-  const postHtmlList=(posts.data||[]).map(p=>postHtml(p,postProfiles.find(x=>x.id===p.user_id),meta[p.id])).join("")||'<div class="card empty">No se encontraron publicaciones.</div>';
+  const postHtmlList=visiblePostRows.map(p=>postHtml(p,postProfiles.find(x=>x.id===p.user_id),meta[p.id])).join("")||'<div class="card empty">No se encontraron publicaciones.</div>';
   $("#content").innerHTML=pageHeader("Resultados","Búsqueda para “"+q+"”.")+'<section class="card results-block"><h3>Personas</h3>'+userHtml+'</section><section class="results-posts"><h3>Publicaciones</h3>'+postHtmlList+'</section>';
   $$("[data-profile]").forEach(b=>b.onclick=()=>renderProfile(b.dataset.profile));bindPostEvents();
 }
