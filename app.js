@@ -441,7 +441,9 @@ async function toggleRepost(id){
   if(q.error)return toast(q.error.message);
   const r=q.data?await supabase.from("reposts").delete().eq("post_id",id).eq("user_id",session.user.id):await supabase.from("reposts").insert({user_id:session.user.id,post_id:id});
   if(r.error)return toast(r.error.message);
-  toast(q.data?"Repost eliminado.":"Repost publicado. 🔁");await navigate(currentNav);
+  toast(q.data?"Repost eliminado.":"Repost publicado. 🔁");
+  if(currentNav==="profile")await renderProfile(currentProfileViewId||currentProfile.id);
+  else await navigate(currentNav);
 }
 
 async function sharePost(id){
@@ -580,7 +582,9 @@ async function votePoll(pollId,optionId){
     r=await supabase.from("poll_votes").update({option_id:optionId}).eq("poll_id",pollId).eq("user_id",session.user.id);
   }else r=await supabase.from("poll_votes").insert({poll_id:pollId,option_id:optionId,user_id:session.user.id});
   if(r.error)return toast(r.error.message);
-  toast("Voto registrado.");await navigate(currentNav);
+  toast("Voto registrado.");
+  if(currentNav==="profile")await renderProfile(currentProfileViewId||currentProfile.id);
+  else await navigate(currentNav);
 }
 
 async function renderExplore(){
