@@ -9,6 +9,7 @@ let feedMode="forYou";
 let profileTab="posts";
 let currentChatUser=null;
 let currentGroup=null;
+let currentProfileViewId=null;
 let toastTimer=null;
 let liveTimer=null;
 let searchTimer=null;
@@ -421,7 +422,8 @@ async function toggleLike(id){
   const r=q.data?await supabase.from("likes").delete().eq("post_id",id).eq("user_id",session.user.id):await supabase.from("likes").insert({post_id:id,user_id:session.user.id});
   if(r.error)return toast(r.error.message);
   await refreshNotifCount();
-  await navigate(currentNav);
+  if(currentNav==="profile")await renderProfile(currentProfileViewId||currentProfile.id);
+  else await navigate(currentNav);
 }
 
 async function toggleSave(id){
@@ -430,7 +432,8 @@ async function toggleSave(id){
   const r=q.data?await supabase.from("saved_posts").delete().eq("post_id",id).eq("user_id",session.user.id):await supabase.from("saved_posts").insert({user_id:session.user.id,post_id:id});
   if(r.error)return toast(r.error.message);
   toast(q.data?"Quitado de guardados.":"Guardado 🔖");
-  await navigate(currentNav);
+  if(currentNav==="profile")await renderProfile(currentProfileViewId||currentProfile.id);
+  else await navigate(currentNav);
 }
 
 async function toggleRepost(id){
@@ -464,7 +467,8 @@ async function setReaction(postId,type){
   else if(q.data)r=await supabase.from("post_reactions").update({type}).eq("post_id",postId).eq("user_id",session.user.id);
   else r=await supabase.from("post_reactions").insert({post_id:postId,user_id:session.user.id,type});
   if(r.error)return toast(r.error.message);
-  await navigate(currentNav);
+  if(currentNav==="profile")await renderProfile(currentProfileViewId||currentProfile.id);
+  else await navigate(currentNav);
 }
 
 async function loadComments(id){
@@ -512,7 +516,9 @@ async function editPost(id){
     e.preventDefault();
     const u=await supabase.from("posts").update({content:$("#postEditText").value.trim(),edited_at:new Date().toISOString()}).eq("id",id).eq("user_id",session.user.id);
     if(u.error)return toast(u.error.message);
-    closeModal();toast("Publicación actualizada.");await navigate(currentNav);
+    closeModal();toast("Publicación actualizada.");
+    if(currentNav==="profile")await renderProfile(currentProfileViewId||currentProfile.id);
+    else await navigate(currentNav);
   };
 }
 
@@ -522,7 +528,9 @@ async function deletePost(id){
   const r=await supabase.from("posts").delete().eq("id",id).eq("user_id",session.user.id);
   if(r.error)return toast(r.error.message);
   if(q.data?.media_path)await supabase.storage.from("media").remove([q.data.media_path]);
-  toast("Publicación eliminada.");await navigate(currentNav);
+  toast("Publicación eliminada.");
+  if(currentNav==="profile")await renderProfile(currentProfileViewId||currentProfile.id);
+  else await navigate(currentNav);
 }
 
 async function reportPost(id){
@@ -630,6 +638,7 @@ async function renderSaved(){
 }
 
 async function renderProfile(id){
+  currentProfileViewId=id;
   const p=await profileById(id);if(!p)return;
   const own=id===session.user.id;
   const [posts,followers,following,follow,blockedByMe,reposts]=await Promise.all([
@@ -948,6 +957,7 @@ $("#logoutBtn").onclick=()=>supabase.auth.signOut();
 $("#themeBtn").onclick=()=>{const current=localStorage.vibeTheme||"system";setTheme(current==="dark"?"light":"dark")};
 $("#searchInput").oninput=e=>{clearTimeout(searchTimer);const q=e.target.value.trim();if(!q)return;searchTimer=setTimeout(()=>searchEverything(q),500)};
 $("#searchInput").onkeydown=e=>{if(e.key==="Enter")searchEverything(e.target.value)};
+$("#mobileCreateBtn")?.addEventListener("click",async()=>{await navigate("feed");setTimeout(()=>$("#postText")?.focus(),0)});
 $("#modal").onclick=e=>{if(e.target.id==="modal")closeModal()};
 $(".modal-close").onclick=closeModal;
 
