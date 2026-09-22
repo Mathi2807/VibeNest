@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111318">
+<meta name="description" content="VibeNest — una red social web simple, rápida y privada.">
+<title>VibeNest</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="toast" class="toast"></div>
+<section id="authView" class="auth-view">
+  <div class="auth-card">
+    <div class="brand"><span class="brand-mark">V</span><div><b>VibeNest</b><small>tu espacio, tus vibes.</small></div></div>
+    <div class="auth-tabs"><button class="active" data-auth="login">Entrar</button><button data-auth="signup">Crear cuenta</button></div>
+    <form id="authForm">
+      <label id="displayWrap" class="hidden">Nombre visible<input id="displayName" maxlength="40" autocomplete="name"></label>
+      <label>Correo<input id="email" type="email" required autocomplete="email"></label>
+      <label>Contraseña<input id="password" type="password" required minlength="6" autocomplete="current-password"></label>
+      <label id="usernameWrap" class="hidden">Usuario<input id="username" maxlength="24" pattern="[A-Za-z0-9_]+" placeholder="mathi_28"></label>
+      <button class="primary wide" type="submit" id="authSubmit">Entrar</button>
+    </form>
+    <p class="muted center">Al crear una cuenta aceptas las reglas de la comunidad.</p>
+  </div>
+</section>
+
+<div id="appView" class="hidden">
+<header class="topbar">
+  <a class="brand" href="#" data-nav="feed"><span class="brand-mark">V</span><div><b>VibeNest</b><small>tu espacio, tus vibes.</small></div></a>
+  <div class="search"><span>⌕</span><input id="searchInput" placeholder="Buscar personas..."></div>
+  <nav><button data-nav="feed">Inicio</button><button data-nav="notifications">🔔 <i id="notifCount"></i></button><button data-nav="profile">Perfil</button><button id="themeBtn" title="Tema">☾</button><button id="logoutBtn" title="Salir">↪</button></nav>
+</header>
+<main class="layout">
+  <aside class="sidebar card">
+    <div id="miniProfile"></div>
+    <button class="side-btn active" data-nav="feed">⌂ Inicio</button>
+    <button class="side-btn" data-nav="profile">◉ Mi perfil</button>
+    <button class="side-btn" data-nav="notifications">♢ Notificaciones</button>
+    <button class="side-btn" id="rulesBtn">ⓘ Reglas</button>
+  </aside>
+  <section id="content"></section>
+  <aside class="rightbar">
+    <div class="card tips"><h3>VibeNest</h3><p>Comparte cosas, descubre gente y mantén tu espacio tranquilo.</p><button id="rulesBtn2">Ver reglas</button></div>
+  </aside>
+</main>
+</div>
+
+<div id="modal" class="modal hidden"><div class="modal-box"><button class="modal-close">×</button><div id="modalContent"></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
