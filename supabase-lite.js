@@ -104,7 +104,12 @@
       return this;
     }
     eq(column, value){ this.params.set(column, "eq." + String(value)); return this; }
-    ilike(column, value){ this.params.set(column, "ilike." + String(value)); return this; }
+    neq(column, value){ this.params.set(column, "neq." + String(value)); return this; }
+    gt(column, value){ this.params.set(column, "gt." + String(value)); return this; }
+    gte(column, value){ this.params.set(column, "gte." + String(value)); return this; }
+    lt(column, value){ this.params.set(column, "lt." + String(value)); return this; }
+    lte(column, value){ this.params.set(column, "lte." + String(value)); return this; }
+    is(column, value){ this.params.set(column, "is." + (value === null ? "null" : String(value))); return this; }
     in(column, values){
       const list = Array.isArray(values) ? values : [values];
       this.params.set(column, "in.(" + list.map(v=>String(v).replace(/[(),]/g,"")).join(",") + ")");
@@ -115,6 +120,7 @@
       return this;
     }
     limit(value){ this.params.set("limit", String(value)); return this; }
+    range(from, to){ this.params.set("offset", String(from)); this.params.set("limit", String(Math.max(0, to-from+1))); return this; }
     insert(value){
       this.method = "POST";
       this.body = value;
