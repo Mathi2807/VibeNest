@@ -361,3 +361,7 @@ body.dark{
   .cover{border-radius:0}
   .profile-card{overflow:visible}
 }
+
+.creator-badge{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:3px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:10px;font-weight:850;vertical-align:middle;white-space:nowrap}
+.post-author .creator-badge{font-size:9px;padding:2px 6px;margin-left:5px}
+.profile-username .creator-badge{font-size:10px}
