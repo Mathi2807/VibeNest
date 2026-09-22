@@ -1,0 +1,23 @@
+name: Export VibeNest site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Package site
+        run: |
+          rm -rf .git .github
+          zip -r vibenest-site.zip . -x "*.DS_Store"
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibenest-site
+          path: vibenest-site.zip
+          if-no-files-found: error
