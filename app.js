@@ -212,6 +212,7 @@ async function navigate(n){
   stopLiveRefresh();
   if(n==="feed")await renderFeed();
   else if(n==="explore")await renderExplore();
+  else if(n==="shorts")await renderShorts();
   else if(n==="saved")await renderSaved();
   else if(n==="messages")await renderMessages(true);
   else if(n==="notifications")await renderNotifications();
@@ -610,6 +611,57 @@ async function renderExplore(){
   $("#exploreSearchBtn").onclick=()=>searchEverything($("#exploreSearch").value);
   $("#exploreSearch").onkeydown=e=>{if(e.key==="Enter")searchEverything(e.target.value)};
   bindPostEvents();
+}
+
+
+async function renderShorts(){
+  const r=await supabase.from("posts").select("*").eq("media_type","video").order("created_at",{ascending:false}).limit(100);
+  if(r.error){
+    $("#content").innerHTML=pageHeader("Vibe Shorts","Videos cortos de la comunidad.")+'<div class="card empty">No se pudieron cargar los Shorts.</div>';
+    return toast(r.error.message);
+  }
+  const blocked=await currentBlockIds();
+  const rawPosts=(r.data||[]).filter(p=>p.media_url&&!blocked.has(p.user_id));
+  const followingRes=await supabase.from("follows").select("following_id").eq("follower_id",session.user.id);
+  const followingSet=new Set((followingRes.data||[]).map(x=>x.following_id));
+  const profiles=await profilesByIds(rawPosts.map(p=>p.user_id));
+  const profileMap=Object.fromEntries(profiles.map(p=>[p.id,p]));
+  const posts=rawPosts.filter(p=>{
+    const author=profileMap[p.user_id];
+    return author?.profile_visibility!=="private" || p.user_id===session.user.id || followingSet.has(p.user_id);
+  });
+  const meta=await loadPostMeta(posts.map(p=>p.id));
+  $("#content").innerHTML='<div class="shorts-page">'+pageHeader("Vibe Shorts","Videos cortos para descubrir y compartir.",'<button class="primary" id="createShortBtn">＋ Crear Short</button>')+'<div class="card shorts-hint"><b>▶ Desliza para cambiar de video.</b> <span class="muted">Los videos publicados desde el feed también aparecen aquí.</span></div><div class="shorts-feed">'+(posts.map(p=>shortHtml(p,profileMap[p.user_id],meta[p.id]||{})).join("")||'<div class="card short-empty"><b>🎬 Aún no hay Shorts</b><p>Publica un video desde Inicio y será parte de esta sección.</p></div>')+'</div></div>';
+  $("#createShortBtn").onclick=async()=>{await navigate("feed");setTimeout(()=>$("#mediaInput")?.click(),0)};
+  $(".short-video").forEach(v=>v.addEventListener("click",()=>{if(v.paused)v.play().catch(()=>{});else v.pause()}));
+  $(".short-mute").forEach(b=>b.onclick=e=>{e.stopPropagation();const v=document.getElementById(b.dataset.mute);if(!v)return;v.muted=!v.muted;b.textContent=v.muted?"🔇":"🔊"});
+  $(".short-card [data-like]").forEach(b=>b.onclick=()=>toggleLike(b.dataset.like));
+  $(".short-card [data-save]").forEach(b=>b.onclick=()=>toggleSave(b.dataset.save));
+  $(".short-card [data-repost]").forEach(b=>b.onclick=()=>toggleRepost(b.dataset.repost));
+  $(".short-card [data-share]").forEach(b=>b.onclick=()=>sharePost(b.dataset.share));
+  $(".short-card [data-shortcomments]").forEach(b=>b.onclick=()=>openShortComments(b.dataset.shortcomments));
+  const videos=$(".short-video");
+  if("IntersectionObserver" in window){
+    const observer=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting&&entry.intersectionRatio>.65){
+          videos.forEach(v=>{if(v!==entry.target)v.pause()});
+          entry.target.play().catch(()=>{});
+        }
+      });
+    },{threshold:[.65]});
+    videos.forEach(v=>observer.observe(v));
+  }else if(videos[0])videos[0].play().catch(()=>{});
+}
+
+function shortHtml(p,u,meta={}){
+  const likeCount=meta.likeCount||0,repostCount=meta.repostCount||0;
+  const caption=p.content?renderRichText(p.content):"Sin descripción.";
+  return'<article class="short-card" data-short="'+p.id+'"><video id="short-video-'+p.id+'" class="short-video" playsinline muted loop preload="metadata" src="'+esc(p.media_url)+'"></video><div class="short-gradient"></div><div class="short-top">'+avatar(u,true)+'<div class="short-author"><b>'+esc(u?.display_name||"Usuario")+'</b><small>@'+esc(u?.username||"user")+' · '+timeAgo(p.created_at)+'</small></div><span class="short-label">VIBE SHORT</span></div><button class="short-mute" data-mute="short-video-'+p.id+'" aria-label="Cambiar sonido">🔇</button><div class="short-info"><p>'+caption+'</p></div><div class="short-actions"><button class="short-action" data-like="'+p.id+'"><span>'+(meta.liked?"❤️":"🤍")+'</span><small>'+formatCount(likeCount)+'</small></button><button class="short-action" data-shortcomments="'+p.id+'"><span>💬</span><small>'+formatCount(meta.commentCount||0)+'</small></button><button class="short-action" data-repost="'+p.id+'"><span>'+(meta.reposted?"🔁":"↗️")+'</span><small>'+formatCount(repostCount)+'</small></button><button class="short-action" data-save="'+p.id+'"><span>'+(meta.saved?"🔖":"▫️")+'</span><small>Guardar</small></button><button class="short-action" data-share="'+p.id+'"><span>↗</span><small>Compartir</small></button></div></article>';
+}
+async function openShortComments(id){
+  openModal('<h2>💬 Comentarios</h2><div class="comments" id="comments-'+id+'"><div class="loading">Cargando…</div></div>');
+  await loadComments(id);
 }
 
 async function searchEverything(query){
