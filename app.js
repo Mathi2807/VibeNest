@@ -40,6 +40,28 @@ function avatar(p,small=false){
   return '<div class="'+cls+'">'+initials(p)+'</div>';
 }
 
+const AUTO_MOD_PATTERNS=[
+  /(^|[^a-z0-9])(porn|porno|pornograf[ií]a|pornogr[aá]fico|xxx|nudes?|desnudo|desnuda|desnudos|desnudas|genitales|onlyfans)([^a-z0-9]|$)/i,
+  /(^|[^a-z0-9])(gore|snuff|decapitaci[oó]n|desmembr|mutilaci[oó]n|mutilado|mutilada)([^a-z0-9]|$)/i,
+  /(^|[^a-z0-9])(vendo|compro)[ -]+(coca[ií]na|crack|metanfetamina|fentanilo|hero[ií]na|armas)([^a-z0-9]|$)/i
+];
+
+function automodTextBlocked(value){
+  return AUTO_MOD_PATTERNS.some(re=>re.test(String(value||"")));
+}
+
+function automodFileBlocked(file){
+  return !!file&&automodTextBlocked(String(file.name||"").replace(/[_-]+/g," "));
+}
+
+function automodToast(){
+  toast("🛡️ AutoMod bloqueó ese contenido porque no cumple las normas de VibeNest.");
+}
+
+function creatorBadge(p){
+  return p?.is_creator?'<span class="creator-badge" title="Creador de VibeNest">👑 Creador</span>':"";
+}
+
 function formatCount(n){
   n=Number(n||0);
   if(n<1000)return String(n);
@@ -107,6 +129,7 @@ function showAuthError(error){
 
 async function uploadMedia(file,folder,limitMB){
   if(!file)throw new Error("No elegiste ningún archivo.");
+  if(automodFileBlocked(file))throw new Error("AUTOMOD_BLOCKED");
   const image=/^image\/(png|jpe?g|gif|webp)$/i.test(file.type);
   const video=/^video\/(mp4|webm|ogg)$/i.test(file.type);
   if(!image&&!video)throw new Error("Solo se permiten imágenes PNG/JPG/GIF/WebP y videos MP4/WebM/OGG.");
@@ -185,7 +208,7 @@ async function handleSession(s){
 
 function renderMini(){
   const p=currentProfile;
-  $("#miniProfile").innerHTML='<button class="mini-profile" data-profile="'+esc(p.id)+'">'+avatar(p,true)+'<span><b>'+esc(p.display_name)+'</b><small>@'+esc(p.username)+'</small></span></button>';
+  $("#miniProfile").innerHTML='<button class="mini-profile" data-profile="'+esc(p.id)+'">'+avatar(p,true)+'<span><b>'+esc(p.display_name)+creatorBadge(p)+'</b><small>@'+esc(p.username)+'</small></span></button>';
 }
 
 function stopLiveRefresh(){
@@ -251,7 +274,7 @@ async function fetchStories(){
 }
 
 function composer(){
-  return'<div class="card composer"><div class="composer-head">'+avatar(currentProfile,true)+'<div><b>'+esc(currentProfile.display_name)+'</b><small> Comparte algo con tu red</small></div></div><textarea id="postText" maxlength="2200" placeholder="¿Qué está pasando? Usa #hashtags o crea una encuesta."></textarea><div id="pollComposer" class="poll-composer hidden"><input id="pollQuestion" maxlength="200" placeholder="Pregunta de la encuesta…"><div id="pollOptions"><input class="poll-option-input" maxlength="80" placeholder="Opción 1"><input class="poll-option-input" maxlength="80" placeholder="Opción 2"></div><button class="text-btn" id="addPollOption">+ Añadir opción</button></div><div class="composer-preview hidden" id="mediaPreview"></div><div class="composer-actions"><div class="composer-tools"><label class="tool-btn">📎 Foto/video<input id="mediaInput" type="file" accept="image/*,video/*" hidden></label><button class="tool-btn" id="pollToggle">📊 Encuesta</button></div><button class="primary" id="postBtn">Publicar</button></div><small id="fileName" class="muted"></small></div>';
+  return'<div class="card composer"><div class="composer-head">'+avatar(currentProfile,true)+'<div><b>'+esc(currentProfile.display_name)+creatorBadge(currentProfile)+'</b><small> Comparte algo con tu red</small></div></div><textarea id="postText" maxlength="2200" placeholder="¿Qué está pasando? Usa #hashtags o crea una encuesta."></textarea><div id="pollComposer" class="poll-composer hidden"><input id="pollQuestion" maxlength="200" placeholder="Pregunta de la encuesta…"><div id="pollOptions"><input class="poll-option-input" maxlength="80" placeholder="Opción 1"><input class="poll-option-input" maxlength="80" placeholder="Opción 2"></div><button class="text-btn" id="addPollOption">+ Añadir opción</button></div><div class="composer-preview hidden" id="mediaPreview"></div><div class="composer-actions"><div class="composer-tools"><label class="tool-btn">📎 Foto/video<input id="mediaInput" type="file" accept="image/*,video/*" hidden></label><button class="tool-btn" id="pollToggle">📊 Encuesta</button></div><button class="primary" id="postBtn">Publicar</button></div><small id="fileName" class="muted">🛡️ AutoMod activo · contenido claramente inapropiado será bloqueado.</small></div>';
 }
 
 async function renderFeed(){
@@ -287,7 +310,7 @@ function postHtml(p,u,meta={}){
   let reactionSummary="";
   Object.keys(reactions).forEach(k=>{if(reactions[k])reactionSummary+=reactionLabels[k]+formatCount(reactions[k])+" "});
   const media=p.media_url?(p.media_type==="video"?'<video class="post-media" controls preload="metadata" src="'+esc(p.media_url)+'"></video>':'<img class="post-media" loading="lazy" src="'+esc(p.media_url)+'" alt="Publicación">'):"";
-  return'<article class="card post" data-post="'+p.id+'"><div class="post-head"><button class="profile-link" data-profile="'+esc(u?.id||p.user_id)+'">'+avatar(u,true)+'</button><div class="post-author"><button class="plain-link" data-profile="'+esc(u?.id||p.user_id)+'">'+esc(u?.display_name||"Usuario")+'</button><small>@'+esc(u?.username||"user")+' · '+timeAgo(p.created_at)+esc(edited)+'</small></div><div class="post-menu"><button class="icon-btn" data-menu="'+p.id+'">•••</button><div class="post-menu-pop hidden" id="menu-'+p.id+'">'+(isMine?'<button data-edit="'+p.id+'">✏️ Editar</button><button class="danger-text" data-delete="'+p.id+'">🗑️ Eliminar</button>':'<button data-report="'+p.id+'">🚩 Reportar</button><button data-block="'+p.user_id+'">⛔ Bloquear</button>')+'</div></div></div>'+(p.content?'<div class="post-content">'+renderRichText(p.content)+'</div>':"")+media+(poll?pollHtmlView(p):"")+'<div class="post-summary"><span>'+formatCount(likeCount)+' me gusta</span><span>'+formatCount(commentCount)+' comentarios</span><span>'+formatCount(repostCount)+' reposts</span>'+(reactionSummary?'<span>'+reactionSummary+'</span>':"")+'</div><div class="post-actions"><button class="'+(meta.liked?"liked":"")+'" data-like="'+p.id+'">♥ <span>'+formatCount(likeCount)+'</span></button><button data-reaction-toggle="'+p.id+'">✨ Reaccionar'+(meta.myReaction?" "+reactionLabels[meta.myReaction]:"")+'</button><button data-comments="'+p.id+'">💬</button><button class="'+(meta.saved?"saved":"")+'" data-save="'+p.id+'">🔖</button><button class="'+(meta.reposted?"reposted":"")+'" data-repost="'+p.id+'">🔁</button></div><div class="reaction-picker hidden" id="reaction-'+p.id+'"><button data-reaction="fire" data-post="'+p.id+'">🔥</button><button data-reaction="laugh" data-post="'+p.id+'">😂</button><button data-reaction="wow" data-post="'+p.id+'">😮</button><button data-reaction="sad" data-post="'+p.id+'">😢</button><button data-reaction="party" data-post="'+p.id+'">🎉</button></div><div class="comments" id="comments-'+p.id+'"></div></article>';
+  return'<article class="card post" data-post="'+p.id+'"><div class="post-head"><button class="profile-link" data-profile="'+esc(u?.id||p.user_id)+'">'+avatar(u,true)+'</button><div class="post-author"><button class="plain-link" data-profile="'+esc(u?.id||p.user_id)+'">'+esc(u?.display_name||"Usuario")+'</button>'+creatorBadge(u)+'<small>@'+esc(u?.username||"user")+' · '+timeAgo(p.created_at)+esc(edited)+'</small></div><div class="post-menu"><button class="icon-btn" data-menu="'+p.id+'">•••</button><div class="post-menu-pop hidden" id="menu-'+p.id+'">'+(isMine?'<button data-edit="'+p.id+'">✏️ Editar</button><button class="danger-text" data-delete="'+p.id+'">🗑️ Eliminar</button>':'<button data-report="'+p.id+'">🚩 Reportar</button><button data-block="'+p.user_id+'">⛔ Bloquear</button>')+'</div></div></div>'+(p.content?'<div class="post-content">'+renderRichText(p.content)+'</div>':"")+media+(poll?pollHtmlView(p):"")+'<div class="post-summary"><span>'+formatCount(likeCount)+' me gusta</span><span>'+formatCount(commentCount)+' comentarios</span><span>'+formatCount(repostCount)+' reposts</span>'+(reactionSummary?'<span>'+reactionSummary+'</span>':"")+'</div><div class="post-actions"><button class="'+(meta.liked?"liked":"")+'" data-like="'+p.id+'">♥ <span>'+formatCount(likeCount)+'</span></button><button data-reaction-toggle="'+p.id+'">✨ Reaccionar'+(meta.myReaction?" "+reactionLabels[meta.myReaction]:"")+'</button><button data-comments="'+p.id+'">💬</button><button class="'+(meta.saved?"saved":"")+'" data-save="'+p.id+'">🔖</button><button class="'+(meta.reposted?"reposted":"")+'" data-repost="'+p.id+'">🔁</button></div><div class="reaction-picker hidden" id="reaction-'+p.id+'"><button data-reaction="fire" data-post="'+p.id+'">🔥</button><button data-reaction="laugh" data-post="'+p.id+'">😂</button><button data-reaction="wow" data-post="'+p.id+'">😮</button><button data-reaction="sad" data-post="'+p.id+'">😢</button><button data-reaction="party" data-post="'+p.id+'">🎉</button></div><div class="comments" id="comments-'+p.id+'"></div></article>';
 }
 
 function pollHtmlView(poll){
@@ -375,6 +398,7 @@ async function createPost(){
     if(new Set(optionLabels.map(x=>x.toLowerCase())).size!==optionLabels.length)return toast("No repitas opciones en la encuesta.");
   }
   if(!text&&!file&&!pollOpen)return toast("Escribe algo, elige multimedia o crea una encuesta.");
+  if(automodTextBlocked(text)||automodTextBlocked(pollQuestion)||optionLabels.some(automodTextBlocked)){automodToast();return;}
   btn.disabled=true;btn.textContent="Publicando…";
   let media=null,createdPostId=null;
   try{
@@ -395,7 +419,7 @@ async function createPost(){
   }catch(err){
     if(createdPostId)await supabase.from("posts").delete().eq("id",createdPostId).eq("user_id",session.user.id);
     if(media?.path)await supabase.storage.from("media").remove([media.path]);
-    toast("No se pudo publicar: "+(err.message||"error desconocido"));
+    if(String(err?.message||"").includes("AUTOMOD_BLOCKED"))automodToast();else toast("No se pudo publicar: "+(err.message||"error desconocido"));
   }finally{btn.disabled=false;btn.textContent="Publicar"}
 }
 
@@ -486,6 +510,7 @@ async function loadComments(id){
   box.innerHTML+=(r.data?.length?"":"<div class=\"comment-empty\">Sé el primero en comentar.</div>")+'<form class="comment-form" data-comment-form="'+id+'"><input maxlength="500" placeholder="Escribe un comentario…"><button>Enviar</button></form>';
   $("[data-comment-form='"+id+"']").onsubmit=async e=>{
     e.preventDefault();const input=e.target.querySelector("input"),value=input.value.trim();if(!value)return;
+    if(automodTextBlocked(value))return automodToast();
     const ins=await supabase.from("comments").insert({post_id:id,user_id:session.user.id,content:value});
     if(ins.error)toast(ins.error.message);else{input.value="";await loadComments(id);await refreshNotifCount()}
   };
@@ -500,6 +525,7 @@ async function editComment(commentId,postId){
   openModal('<h2>Editar comentario</h2><form id="commentEditForm"><textarea id="commentEditText" maxlength="500">'+esc(r.data.content)+'</textarea><button class="primary wide">Guardar</button></form>');
   $("#commentEditForm").onsubmit=async e=>{
     e.preventDefault();const value=$("#commentEditText").value.trim();if(!value)return toast("El comentario no puede quedar vacío.");
+    if(automodTextBlocked(value))return automodToast();
     const u=await supabase.from("comments").update({content:value}).eq("id",commentId).eq("user_id",session.user.id);
     if(u.error)return toast(u.error.message);closeModal();loadComments(postId);
   };
@@ -720,7 +746,7 @@ async function renderProfile(id){
   if(own)actions='<button class="primary" id="editProfileBtn">Editar perfil</button><button class="secondary-btn" id="achievementsBtn">🏆 Logros</button>';
   else if(blocked)actions='<button class="secondary-btn" id="unblockProfileBtn">Desbloquear</button>';
   else actions='<button class="primary" id="followProfileBtn">'+(follow.data?"Dejar de seguir":"Seguir")+'</button><button class="secondary-btn" id="messageProfileBtn">💬 Mensaje</button><button class="icon-btn large" id="profileMenuBtn">•••</button>';
-  $("#content").innerHTML='<section class="card profile-card"><div class="cover" '+(p.cover_url?'style="background-image:url('+esc(p.cover_url)+')"':"")+'></div><div class="profile-body"><div class="profile-main"><div class="profile-avatar-wrap">'+avatar(p)+'</div><div class="profile-actions">'+actions+'</div></div><div class="profile-copy"><h1>'+esc(p.display_name)+'</h1><div class="profile-username">@'+esc(p.username)+'</div><p>'+renderRichText(p.bio||"Sin biografía todavía.")+'</p>'+(p.website?'<a class="website" href="'+esc(/^https?:\/\//i.test(p.website)?p.website:"https://"+p.website)+'" target="_blank" rel="noopener noreferrer">🔗 '+esc(p.website)+'</a>':"")+'<div class="chips">'+interests+'</div></div><div class="stats"><span><b>'+formatCount(posts.data?.length||0)+'</b><small>posts</small></span><span><b>'+formatCount(followers.count||0)+'</b><small>seguidores</small></span><span><b>'+formatCount(following.count||0)+'</b><small>siguiendo</small></span><span><b>'+formatCount(likeRows.data?.length||0)+'</b><small>likes</small></span></div></div></section><div class="profile-tabs card"><button class="'+(profileTab==="posts"?"active":"")+'" data-profiletab="posts">Publicaciones</button><button class="'+(profileTab==="reposts"?"active":"")+'" data-profiletab="reposts">Reposts</button></div><div id="profilePosts">'+(visiblePosts.map(x=>postHtml(x,p,visibleMeta[x.id]||{})).join("")||'<div class="card empty">No hay publicaciones aquí.</div>')+'</div>';
+  $("#content").innerHTML='<section class="card profile-card"><div class="cover" '+(p.cover_url?'style="background-image:url('+esc(p.cover_url)+')"':"")+'></div><div class="profile-body"><div class="profile-main"><div class="profile-avatar-wrap">'+avatar(p)+'</div><div class="profile-actions">'+actions+'</div></div><div class="profile-copy"><h1>'+esc(p.display_name)+'</h1><div class="profile-username">@'+esc(p.username)+' '+creatorBadge(p)+'</div><p>'+renderRichText(p.bio||"Sin biografía todavía.")+'</p>'+(p.website?'<a class="website" href="'+esc(/^https?:\/\//i.test(p.website)?p.website:"https://"+p.website)+'" target="_blank" rel="noopener noreferrer">🔗 '+esc(p.website)+'</a>':"")+'<div class="chips">'+interests+'</div></div><div class="stats"><span><b>'+formatCount(posts.data?.length||0)+'</b><small>posts</small></span><span><b>'+formatCount(followers.count||0)+'</b><small>seguidores</small></span><span><b>'+formatCount(following.count||0)+'</b><small>siguiendo</small></span><span><b>'+formatCount(likeRows.data?.length||0)+'</b><small>likes</small></span></div></div></section><div class="profile-tabs card"><button class="'+(profileTab==="posts"?"active":"")+'" data-profiletab="posts">Publicaciones</button><button class="'+(profileTab==="reposts"?"active":"")+'" data-profiletab="reposts">Reposts</button></div><div id="profilePosts">'+(visiblePosts.map(x=>postHtml(x,p,visibleMeta[x.id]||{})).join("")||'<div class="card empty">No hay publicaciones aquí.</div>')+'</div>';
   $$("[data-profiletab]").forEach(b=>b.onclick=()=>{profileTab=b.dataset.profiletab;renderProfile(id)});
   bindPostEvents();
   if(own){
@@ -755,6 +781,7 @@ async function editProfileModal(){
     const username=$("#editUser").value.trim().toLowerCase();
     if(!/^[a-z0-9_]{3,24}$/.test(username))return toast("Usuario: 3-24 caracteres, letras, números o _.");
     const data={display_name:$("#editName").value.trim(),username,bio:$("#editBio").value.trim(),website:$("#editWebsite").value.trim(),interests:$("#editInterests").value.split(",").map(x=>x.trim().toLowerCase().replace(/[^a-z0-9áéíóúñü_-]/gi,"")).filter(Boolean).slice(0,8)};
+    if(automodTextBlocked(data.display_name)||automodTextBlocked(data.bio)||automodTextBlocked(data.website))return automodToast();
     try{
       const avatarFile=$("#avatarFile").files[0],coverFile=$("#coverFile").files[0];
       if(avatarFile)data.avatar_url=(await uploadMedia(avatarFile,"avatars",8)).url;
@@ -833,6 +860,7 @@ async function openChat(user){
   $("#chatForm").onsubmit=async e=>{
     e.preventDefault();
     const input=$("#chatInput"),body=input.value.trim();if(!body)return;
+    if(automodTextBlocked(body))return automodToast();
     const r=await supabase.from("messages").insert({sender_id:session.user.id,recipient_id:user.id,body});
     if(r.error)return toast(r.error.message);
     input.value="";await refreshConversation(false);refreshNotifCount();
@@ -873,7 +901,9 @@ async function createGroup(){
   openModal('<h2>Crear grupo</h2><form id="groupForm"><label>Nombre<input id="groupName" maxlength="60" required></label><label>Descripción<textarea id="groupDescription" maxlength="240"></textarea></label><button class="primary wide">Crear</button></form>');
   $("#groupForm").onsubmit=async e=>{
     e.preventDefault();
-    const ins=await supabase.from("groups").insert({owner_id:session.user.id,name:$("#groupName").value.trim(),description:$("#groupDescription").value.trim()});
+    const name=$("#groupName").value.trim(),description=$("#groupDescription").value.trim();
+    if(automodTextBlocked(name)||automodTextBlocked(description))return automodToast();
+    const ins=await supabase.from("groups").insert({owner_id:session.user.id,name,description});
     if(ins.error)return toast(ins.error.message);
     const group=ins.data?.[0]||ins.data,mem=await supabase.from("group_members").insert({group_id:group.id,user_id:session.user.id});
     if(mem.error)return toast(mem.error.message);
@@ -901,6 +931,7 @@ async function openGroup(id){
   $("#backGroups").onclick=()=>{currentGroup=null;navigate("groups")};
   $("#groupFormMsg").onsubmit=async e=>{
     e.preventDefault();const body=$("#groupMsgInput").value.trim();if(!body)return;
+    if(automodTextBlocked(body))return automodToast();
     const r=await supabase.from("group_messages").insert({group_id:id,user_id:session.user.id,body});
     if(r.error)return toast(r.error.message);
     $("#groupMsgInput").value="";refreshGroupChat(true);
@@ -923,8 +954,10 @@ function openStoryComposer(){
   $("#storyForm").onsubmit=async e=>{
     e.preventDefault();
     try{
+      const caption=$("#storyCaption").value.trim();
+      if(automodTextBlocked(caption))return automodToast();
       const media=await uploadMedia($("#storyFile").files[0],"stories",15);
-      const r=await supabase.from("stories").insert({user_id:session.user.id,media_url:media.url,media_type:media.type,media_path:media.path,caption:$("#storyCaption").value.trim()});
+      const r=await supabase.from("stories").insert({user_id:session.user.id,media_url:media.url,media_type:media.type,media_path:media.path,caption});
       if(r.error)throw r.error;
       closeModal();toast("Story publicada. ✨");await renderFeed();
     }catch(err){toast("No se pudo publicar: "+err.message)}
@@ -958,7 +991,7 @@ async function deleteStory(s){
 
 async function renderSettings(){
   const p=currentProfile,blocks=await supabase.from("blocks").select("blocked_id,created_at").eq("blocker_id",session.user.id),blockedProfiles=await profilesByIds((blocks.data||[]).map(x=>x.blocked_id));
-  $("#content").innerHTML=pageHeader("Configuración","Personaliza cómo funciona VibeNest para ti.")+'<div class="settings-grid"><section class="card settings-card"><h3>Cuenta y perfil</h3><p class="muted">Gestiona la información que ven las demás personas.</p><button class="settings-row" id="settingsEditProfile"><span>👤 Editar perfil</span><b>›</b></button><button class="settings-row" id="settingsProfilePage"><span>👀 Ver mi perfil</span><b>›</b></button></section><section class="card settings-card"><h3>Apariencia</h3><label>Tema<select id="themeSelect"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></label></section><section class="card settings-card"><h3>Privacidad</h3><label class="switch-row"><span><b>Permitir mensajes</b><small>Las personas podrán iniciar chats contigo.</small></span><input id="allowMessages" type="checkbox" '+(p.allow_messages!==false?"checked":"")+'></label><label class="switch-row"><span><b>Perfil público</b><small>Tu perfil aparece en búsquedas y exploración.</small></span><input id="profilePublic" type="checkbox" '+(p.profile_visibility!=="private"?"checked":"")+'></label></section><section class="card settings-card"><h3>Usuarios bloqueados</h3>'+(blockedProfiles.map(x=>'<div class="blocked-row">'+avatar(x,true)+'<span><b>'+esc(x.display_name)+'</b><small>@'+esc(x.username)+'</small></span><button class="secondary-btn" data-unblock="'+x.id+'">Desbloquear</button></div>').join("")||'<div class="empty compact">No has bloqueado a nadie.</div>')+'</section><section class="card settings-card"><h3>Comunidad</h3><button class="settings-row" id="settingsRules"><span>📜 Reglas de VibeNest</span><b>›</b></button><button class="settings-row" id="settingsAchievements"><span>🏆 Mis logros</span><b>›</b></button></section><section class="card settings-card danger-card"><h3>Sesión</h3><p class="muted">Cierra sesión en este dispositivo.</p><button class="danger-btn" id="settingsLogout">Cerrar sesión</button></section></div>';
+  $("#content").innerHTML=pageHeader("Configuración","Personaliza cómo funciona VibeNest para ti.")+'<div class="settings-grid"><section class="card settings-card"><h3>🛡️ AutoMod</h3><p class="muted">Filtra contenido claramente inapropiado en publicaciones, comentarios, mensajes, grupos, stories y perfiles.</p></section><section class="card settings-card"><h3>Cuenta y perfil</h3><p class="muted">Gestiona la información que ven las demás personas.</p><button class="settings-row" id="settingsEditProfile"><span>👤 Editar perfil</span><b>›</b></button><button class="settings-row" id="settingsProfilePage"><span>👀 Ver mi perfil</span><b>›</b></button></section><section class="card settings-card"><h3>Apariencia</h3><label>Tema<select id="themeSelect"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></label></section><section class="card settings-card"><h3>Privacidad</h3><label class="switch-row"><span><b>Permitir mensajes</b><small>Las personas podrán iniciar chats contigo.</small></span><input id="allowMessages" type="checkbox" '+(p.allow_messages!==false?"checked":"")+'></label><label class="switch-row"><span><b>Perfil público</b><small>Tu perfil aparece en búsquedas y exploración.</small></span><input id="profilePublic" type="checkbox" '+(p.profile_visibility!=="private"?"checked":"")+'></label></section><section class="card settings-card"><h3>Usuarios bloqueados</h3>'+(blockedProfiles.map(x=>'<div class="blocked-row">'+avatar(x,true)+'<span><b>'+esc(x.display_name)+'</b><small>@'+esc(x.username)+'</small></span><button class="secondary-btn" data-unblock="'+x.id+'">Desbloquear</button></div>').join("")||'<div class="empty compact">No has bloqueado a nadie.</div>')+'</section><section class="card settings-card"><h3>Comunidad</h3><button class="settings-row" id="settingsRules"><span>📜 Reglas de VibeNest</span><b>›</b></button><button class="settings-row" id="settingsAchievements"><span>🏆 Mis logros</span><b>›</b></button></section><section class="card settings-card danger-card"><h3>Sesión</h3><p class="muted">Cierra sesión en este dispositivo.</p><button class="danger-btn" id="settingsLogout">Cerrar sesión</button></section></div>';
   $("#themeSelect").value=localStorage.vibeTheme||"system";
   $("#themeSelect").onchange=e=>setTheme(e.target.value);
   $("#settingsEditProfile").onclick=editProfileModal;$("#settingsProfilePage").onclick=()=>renderProfile(session.user.id);$("#settingsRules").onclick=rules;$("#settingsAchievements").onclick=showAchievements;$("#settingsLogout").onclick=()=>supabase.auth.signOut();
@@ -968,7 +1001,7 @@ async function renderSettings(){
 }
 
 function rules(){
-  openModal('<h2>📜 Reglas de VibeNest</h2><div class="rules"><p><b>1. Respeto.</b> Trata a las demás personas con consideración.</p><p><b>2. Privacidad.</b> No publiques datos personales de otras personas sin permiso.</p><p><b>3. Seguridad.</b> No publiques contenido que ponga a alguien en peligro.</p><p><b>4. Reportes.</b> Usa los reportes cuando algo incumpla las reglas.</p><p><b>5. Credenciales.</b> Mantén tu contraseña privada y usa contraseñas únicas.</p><p><b>6. Comunidad.</b> VibeNest funciona mejor cuando cada persona ayuda a mantener un ambiente sano.</p></div>');
+  openModal('<h2>📜 Reglas de VibeNest</h2><div class="rules"><p><b>🛡️ AutoMod.</b> El contenido claramente explícito, gráfico o de venta de sustancias/armas puede ser bloqueado automáticamente.</p><p><b>1. Respeto.</b> Trata a las demás personas con consideración.</p><p><b>2. Privacidad.</b> No publiques datos personales de otras personas sin permiso.</p><p><b>3. Seguridad.</b> No publiques contenido que ponga a alguien en peligro.</p><p><b>4. Reportes.</b> Usa los reportes cuando algo incumpla las reglas.</p><p><b>5. Credenciales.</b> Mantén tu contraseña privada y usa contraseñas únicas.</p><p><b>6. Comunidad.</b> VibeNest funciona mejor cuando cada persona ayuda a mantener un ambiente sano.</p></div>');
 }
 
 function openModal(html){
