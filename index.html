@@ -47,6 +47,23 @@
 </div>
 
 <div id="modal" class="modal hidden"><div class="modal-box"><button class="modal-close">×</button><div id="modalContent"></div></div></div>
+<script>
+(function(){
+  const tabs=document.querySelectorAll("[data-auth]");
+  const display=document.getElementById("displayWrap");
+  const username=document.getElementById("usernameWrap");
+  const submit=document.getElementById("authSubmit");
+  tabs.forEach(function(btn){
+    btn.addEventListener("click",function(){
+      const signup=btn.dataset.auth==="signup";
+      tabs.forEach(function(x){x.classList.toggle("active",x===btn);});
+      display.classList.toggle("hidden",!signup);
+      username.classList.toggle("hidden",!signup);
+      submit.textContent=signup?"Crear cuenta":"Entrar";
+    });
+  });
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
