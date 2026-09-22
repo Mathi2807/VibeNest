@@ -51,7 +51,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .top-nav button:hover,.top-nav button.active{background:var(--surface-2);color:var(--text)}
 .top-nav-btn.active{color:var(--accent)!important;font-weight:750}
 #notifCount{display:none;place-items:center;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--accent);color:#fff;font-size:10px;position:absolute;top:1px;right:-1px}
-.nav-dot{display:none}
+.nav-dot{display:none;width:7px;height:7px;border-radius:50%;background:var(--accent);position:absolute;right:5px;top:6px;box-shadow:0 0 0 2px var(--surface)}
 
 .layout{width:min(1260px,100% - 28px);margin:22px auto 70px;display:grid;grid-template-columns:220px minmax(0,700px) 250px;gap:22px}
 .sidebar,.rightbar{height:max-content;position:sticky;top:90px}
