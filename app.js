@@ -119,12 +119,14 @@ async function uploadMedia(file,folder,limitMB){
 async function refreshNotifCount(){
   if(!session)return;
   const [n,m]=await Promise.all([
-    supabase.from("notifications").select("id",{count:"exact",head:true}).eq("recipient_id",session.user.id).eq("read",false),
+    supabase.from("notifications").select("id",{count:"exact",head:true}).eq("recipient_id",session.user.id).eq("read",false).neq("type","message"),
     supabase.from("messages").select("id",{count:"exact",head:true}).eq("recipient_id",session.user.id).is("read_at",null)
   ]);
-  const count=(n.count||0)+(m.count||0);
-  const e=$("#notifCount");
-  if(e){e.textContent=count?formatCount(count):"";e.style.display=count?"inline-grid":"none"}
+  const notifCount=n.count||0;
+  const messageCount=m.count||0;
+  const e=$("#notifCount"),dot=$("#messageDot");
+  if(e){e.textContent=notifCount?formatCount(notifCount):"";e.style.display=notifCount?"inline-grid":"none"}
+  if(dot)dot.style.display=messageCount?"block":"none";
 }
 
 function setTheme(mode){
@@ -261,8 +263,14 @@ async function renderFeed(){
     return toast(r.error.message);
   }
   const blocked=await currentBlockIds();
-  const posts=(r.data||[]).filter(p=>!blocked.has(p.user_id));
-  const profiles=await profilesByIds(posts.map(p=>p.user_id));
+  const rawPosts=(r.data||[]).filter(p=>!blocked.has(p.user_id));
+  const profiles=await profilesByIds(rawPosts.map(p=>p.user_id));
+  const profileMap=Object.fromEntries(profiles.map(p=>[p.id,p]));
+  const allowedFollowing=new Set(followingIds);
+  const posts=rawPosts.filter(p=>{
+    const author=profileMap[p.user_id];
+    return author?.profile_visibility!=="private" || p.user_id===session.user.id || allowedFollowing.has(p.user_id);
+  });
   const meta=await loadPostMeta(posts.map(p=>p.id));
   c.innerHTML=pageHeader("Inicio","Tu rincón para compartir vibes.",'<button class="seg '+(feedMode==="forYou"?"active":"")+'" data-feedmode="forYou">Para ti</button><button class="seg '+(feedMode==="following"?"active":"")+'" data-feedmode="following">Siguiendo</button>')+storyStrip(stories.stories,stories.profiles)+composer()+'<div id="feedList">'+(posts.map(p=>postHtml(p,profiles.find(x=>x.id===p.user_id),meta[p.id])).join("")||'<div class="card empty">Todavía no hay publicaciones. Sé el primero. 🚀</div>')+'</div>';
   bindFeedControls();bindPostEvents();
@@ -389,7 +397,8 @@ function bindPostEvents(){
   $$("[data-profile]").forEach(b=>b.onclick=()=>renderProfile(b.dataset.profile));
   $$("[data-like]").forEach(b=>b.onclick=()=>toggleLike(b.dataset.like));
   $$("[data-save]").forEach(b=>b.onclick=()=>toggleSave(b.dataset.save));
-  $$("[data-repost]").forEach(b=>b.onclick=()=>toggleRepost(b.dataset.repost));
+  $("[data-repost]").forEach(b=>b.onclick=()=>toggleRepost(b.dataset.repost));
+  $("[data-share]").forEach(b=>b.onclick=()=>sharePost(b.dataset.share));
   $$("[data-comments]").forEach(b=>b.onclick=()=>loadComments(b.dataset.comments));
   $$("[data-reaction-toggle]").forEach(b=>b.onclick=()=>$("#reaction-"+b.dataset.reactionToggle).classList.toggle("hidden"));
   $$("[data-reaction]").forEach(b=>b.onclick=()=>setReaction(b.dataset.post,b.dataset.reaction));
@@ -426,6 +435,21 @@ async function toggleRepost(id){
   const r=q.data?await supabase.from("reposts").delete().eq("post_id",id).eq("user_id",session.user.id):await supabase.from("reposts").insert({user_id:session.user.id,post_id:id});
   if(r.error)return toast(r.error.message);
   toast(q.data?"Repost eliminado.":"Repost publicado. 🔁");await navigate(currentNav);
+}
+
+async function sharePost(id){
+  const url=new URL(window.location.href);
+  url.hash="post-"+id;
+  try{
+    if(navigator.share){
+      await navigator.share({title:"VibeNest",text:"Mira esta publicación en VibeNest",url:url.href});
+      return;
+    }
+    await navigator.clipboard.writeText(url.href);
+    toast("Enlace copiado. 🔗");
+  }catch(err){
+    if(err?.name!=="AbortError")toast("No se pudo compartir el enlace.");
+  }
 }
 
 async function setReaction(postId,type){
@@ -550,7 +574,17 @@ async function votePoll(pollId,optionId){
 async function renderExplore(){
   const r=await supabase.from("posts").select("*").order("created_at",{ascending:false}).limit(100);
   if(r.error)return toast(r.error.message);
-  const blocked=await currentBlockIds(),posts=(r.data||[]).filter(p=>!blocked.has(p.user_id)),meta=await loadPostMeta(posts.map(p=>p.id)),now=Date.now();
+  const blocked=await currentBlockIds();
+  const rawPosts=(r.data||[]).filter(p=>!blocked.has(p.user_id));
+  const profilesForVisibility=await profilesByIds(rawPosts.map(p=>p.user_id));
+  const visibilityMap=Object.fromEntries(profilesForVisibility.map(p=>[p.id,p]));
+  const followingRes=await supabase.from("follows").select("following_id").eq("follower_id",session.user.id);
+  const followingSet=new Set((followingRes.data||[]).map(x=>x.following_id));
+  const posts=rawPosts.filter(p=>{
+    const author=visibilityMap[p.user_id];
+    return author?.profile_visibility!=="private" || p.user_id===session.user.id || followingSet.has(p.user_id);
+  });
+  const meta=await loadPostMeta(posts.map(p=>p.id)),now=Date.now();
   posts.sort((a,b)=>{
     const score=p=>((meta[p.id]?.likeCount||0)*3+(meta[p.id]?.commentCount||0)*2+(meta[p.id]?.repostCount||0)*4+(meta[p.id]?.reactionCount||0)*2)+Math.max(0,72-(now-new Date(p.created_at))/3600000)*0.1;
     return score(b)-score(a);
@@ -565,10 +599,16 @@ async function renderExplore(){
 async function searchEverything(query){
   const q=query.trim().replace(/^#/,"");if(!q)return;
   const pattern="%"+q.replace(/[\\%_]/g,m=>"\\"+m)+"%";
-  const [users,posts]=await Promise.all([supabase.from("profiles").select("*").ilike("username",pattern).limit(20),supabase.from("posts").select("*").ilike("content",pattern).order("created_at",{ascending:false}).limit(40)]);
-  if(users.error||posts.error)return toast((users.error||posts.error).message);
+  const [userByName,displayByName,posts]=await Promise.all([
+    supabase.from("profiles").select("*").ilike("username",pattern).limit(20),
+    supabase.from("profiles").select("*").ilike("display_name",pattern).limit(20),
+    supabase.from("posts").select("*").ilike("content",pattern).order("created_at",{ascending:false}).limit(40)
+  ]);
+  if(userByName.error||displayByName.error||posts.error)return toast((userByName.error||displayByName.error||posts.error).message);
+  const userMap=new Map([...(userByName.data||[]),...(displayByName.data||[])].map(p=>[p.id,p]));
+  const users=[...userMap.values()].filter(p=>p.id===session.user.id||p.profile_visibility!=="private");
   const meta=await loadPostMeta((posts.data||[]).map(p=>p.id)),postProfiles=await profilesByIds((posts.data||[]).map(p=>p.user_id));
-  const userHtml=(users.data||[]).map(p=>'<div class="result-row">'+avatar(p,true)+'<div><button class="plain-link" data-profile="'+p.id+'">'+esc(p.display_name)+'</button><small>@'+esc(p.username)+'</small></div><span class="spacer"></span><button class="secondary-btn" data-profile="'+p.id+'">Ver</button></div>').join("")||'<div class="empty compact">No se encontraron personas.</div>';
+  const userHtml=users.map(p=>'<div class="result-row">'+avatar(p,true)+'<div><button class="plain-link" data-profile="'+p.id+'">'+esc(p.display_name)+'</button><small>@'+esc(p.username)+'</small></div><span class="spacer"></span><button class="secondary-btn" data-profile="'+p.id+'">Ver</button></div>').join("")||'<div class="empty compact">No se encontraron personas.</div>';
   const postHtmlList=(posts.data||[]).map(p=>postHtml(p,postProfiles.find(x=>x.id===p.user_id),meta[p.id])).join("")||'<div class="card empty">No se encontraron publicaciones.</div>';
   $("#content").innerHTML=pageHeader("Resultados","Búsqueda para “"+q+"”.")+'<section class="card results-block"><h3>Personas</h3>'+userHtml+'</section><section class="results-posts"><h3>Publicaciones</h3>'+postHtmlList+'</section>';
   $$("[data-profile]").forEach(b=>b.onclick=()=>renderProfile(b.dataset.profile));bindPostEvents();
@@ -600,7 +640,8 @@ async function renderProfile(id){
   const repIds=(reposts.data||[]).map(x=>x.post_id);
   let repPosts=[];
   if(repIds.length){const rr=await supabase.from("posts").select("*").in("id",repIds);repPosts=rr.data||[]}
-  const visiblePosts=profileTab==="posts"?(posts.data||[]):repPosts;
+  const accessAllowed=own||!blocked&&(p.profile_visibility!=="private"||!!follow?.data);
+  const visiblePosts=accessAllowed?(profileTab==="posts"?(posts.data||[]):repPosts):[];
   const visibleMeta=await loadPostMeta(visiblePosts.map(x=>x.id));
   const ownPostIds=(posts.data||[]).map(x=>x.id);
   const likeRows=ownPostIds.length?await supabase.from("likes").select("post_id").in("post_id",ownPostIds):{data:[]};
