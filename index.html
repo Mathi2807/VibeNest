@@ -13,7 +13,7 @@
 <section id="authView" class="auth-view">
   <div class="auth-card">
     <div class="brand"><span class="brand-mark">V</span><div><b>VibeNest</b><small>tu espacio, tus vibes.</small></div></div>
-    <div class="auth-tabs"><button class="active" data-auth="login">Entrar</button><button data-auth="signup">Crear cuenta</button></div>
+    <div class="auth-tabs"><button type="button" class="active" data-auth="login">Entrar</button><button type="button" data-auth="signup">Crear cuenta</button></div>
     <form id="authForm">
       <label id="displayWrap" class="hidden">Nombre visible<input id="displayName" maxlength="40" autocomplete="name"></label>
       <label>Correo<input id="email" type="email" required autocomplete="email"></label>
@@ -64,8 +64,22 @@
   });
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js'"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script>
+(function(){
+  if(window.VIBENEST_APP_READY)return;
+  const form=document.getElementById("authForm");
+  if(!form)return;
+  form.addEventListener("submit",function(e){
+    if(window.VIBENEST_APP_READY)return;
+    e.preventDefault();
+    const t=document.getElementById("toast");
+    t.textContent="VibeNest no pudo cargar el sistema de conexión. Recarga la página.";
+    t.classList.add("show");
+  });
+})();
+</script>
 </body>
 </html>
