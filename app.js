@@ -374,12 +374,13 @@ async function createPost(){
   }
   if(!text&&!file&&!pollOpen)return toast("Escribe algo, elige multimedia o crea una encuesta.");
   btn.disabled=true;btn.textContent="Publicando…";
-  let media=null;
+  let media=null,createdPostId=null;
   try{
     if(file)media=await uploadMedia(file,"posts",25);
     const postRes=await supabase.from("posts").insert({user_id:session.user.id,content:text||null,media_url:media?.url||null,media_type:media?.type||null,media_path:media?.path||null});
     if(postRes.error)throw postRes.error;
     const post=postRes.data?.[0]||postRes.data;
+    createdPostId=post.id;
     if(pollOpen){
       const pRes=await supabase.from("polls").insert({post_id:post.id,question:pollQuestion});
       if(pRes.error)throw pRes.error;
@@ -390,6 +391,7 @@ async function createPost(){
     $("#postText").value="";$("#mediaInput").value="";$("#fileName").textContent="";$("#mediaPreview").classList.add("hidden");$("#pollComposer").classList.add("hidden");$("#pollToggle").classList.remove("active-tool");$("#pollQuestion").value="";$("#pollOptions").innerHTML='<input class="poll-option-input" maxlength="80" placeholder="Opción 1"><input class="poll-option-input" maxlength="80" placeholder="Opción 2">';
     toast("¡Publicado! 🔥");await renderFeed();
   }catch(err){
+    if(createdPostId)await supabase.from("posts").delete().eq("id",createdPostId).eq("user_id",session.user.id);
     if(media?.path)await supabase.storage.from("media").remove([media.path]);
     toast("No se pudo publicar: "+(err.message||"error desconocido"));
   }finally{btn.disabled=false;btn.textContent="Publicar"}
