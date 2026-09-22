@@ -47,59 +47,17 @@
 </div>
 
 <div id="modal" class="modal hidden"><div class="modal-box"><button class="modal-close">×</button><div id="modalContent"></div></div></div>
+<script src="config.js"></script>
+<script src="supabase-lite.js"></script>
+<script src="app.js"></script>
 <script>
 (function(){
+  if(window.VIBENEST_APP_READY)return;
   const toast=document.getElementById("toast");
-  const show=(msg)=>{toast.textContent=msg;toast.classList.add("show");};
-  const loadScript=(src)=>new Promise((resolve,reject)=>{
-    const s=document.createElement("script");
-    s.src=src;
-    s.onload=()=>resolve();
-    s.onerror=()=>reject(new Error("No se pudo cargar "+src));
-    document.head.appendChild(s);
-  });
-  const loadOneOf=async(urls)=>{
-    let last=null;
-    for(const url of urls){
-      try{await loadScript(url);return}catch(e){last=e;}
-    }
-    throw last||new Error("No se pudo cargar el sistema.");
-  };
-  async function start(){
-    try{
-      await loadOneOf([
-        "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js",
-        "https://unpkg.com/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"
-      ]);
-      if(!window.supabase?.createClient) throw new Error("La librería de Supabase se cargó pero no expuso createClient.");
-      await loadScript("config.js");
-      await loadScript("app.js");
-      if(!window.VIBENEST_APP_READY) throw new Error("VibeNest no terminó de iniciar.");
-    }catch(err){
-      console.error("VibeNest bootstrap:",err);
-      window.VIBENEST_BOOT_ERROR=err?.message||String(err);
-      show("No se pudo conectar con VibeNest. Recarga la página. Si sigue igual, el problema es la conexión con Supabase.");
-    }
+  if(toast){
+    toast.textContent="VibeNest no pudo iniciar correctamente. Recarga la página.";
+    toast.classList.add("show");
   }
-  start();
-
-  document.querySelectorAll("[data-auth]").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      document.querySelectorAll("[data-auth]").forEach(x=>x.classList.toggle("active",x===btn));
-      const signup=btn.dataset.auth==="signup";
-      document.getElementById("displayWrap").classList.toggle("hidden",!signup);
-      document.getElementById("usernameWrap").classList.toggle("hidden",!signup);
-      document.getElementById("authSubmit").textContent=signup?"Crear cuenta":"Entrar";
-    });
-  });
-
-  document.getElementById("authForm").addEventListener("submit",e=>{
-    if(window.VIBENEST_APP_READY)return;
-    e.preventDefault();
-    show(window.VIBENEST_BOOT_ERROR
-      ? "VibeNest todavía no pudo iniciar. Recarga la página."
-      : "VibeNest todavía está cargando. Inténtalo de nuevo en un momento.");
-  });
 })();
 </script>
 </body>
