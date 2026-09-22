@@ -624,6 +624,7 @@ async function searchEverything(query){
   const userMap=new Map([...(userByName.data||[]),...(displayByName.data||[])].map(p=>[p.id,p]));
   const users=[...userMap.values()].filter(p=>p.id===session.user.id||p.profile_visibility!=="private");
   const meta=await loadPostMeta((posts.data||[]).map(p=>p.id)),postProfiles=await profilesByIds((posts.data||[]).map(p=>p.user_id));
+  const visiblePostRows=posts.data||[];
   const userHtml=users.map(p=>'<div class="result-row">'+avatar(p,true)+'<div><button class="plain-link" data-profile="'+p.id+'">'+esc(p.display_name)+'</button><small>@'+esc(p.username)+'</small></div><span class="spacer"></span><button class="secondary-btn" data-profile="'+p.id+'">Ver</button></div>').join("")||'<div class="empty compact">No se encontraron personas.</div>';
   const postHtmlList=visiblePostRows.map(p=>postHtml(p,postProfiles.find(x=>x.id===p.user_id),meta[p.id])).join("")||'<div class="card empty">No se encontraron publicaciones.</div>';
   $("#content").innerHTML=pageHeader("Resultados","Búsqueda para “"+q+"”.")+'<section class="card results-block"><h3>Personas</h3>'+userHtml+'</section><section class="results-posts"><h3>Publicaciones</h3>'+postHtmlList+'</section>';
