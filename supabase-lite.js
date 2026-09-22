@@ -213,11 +213,17 @@
           });
           const out=await parseResponse(res);
           if(out.error)return out;
-          const data={
-            user:out.data?.user || out.data,
-            session:out.data?.session || null
-          };
-          if(data.session){ saveSession(data.session); scheduleRefresh(data.session); emit("SIGNED_IN",data.session); }
+          const raw=out.data || {};
+          const session = raw.session || (raw.access_token ? {
+            access_token: raw.access_token,
+            refresh_token: raw.refresh_token,
+            expires_in: raw.expires_in,
+            expires_at: raw.expires_at || (raw.expires_in ? Math.floor(Date.now()/1000)+Number(raw.expires_in) : undefined),
+            token_type: raw.token_type || "bearer",
+            user: raw.user
+          } : null);
+          const data={user:raw.user || session?.user || raw,session};
+          if(session){ saveSession(session); scheduleRefresh(session); emit("SIGNED_IN",session); }
           return {data,error:null};
         },
         signInWithPassword: async({email,password})=>{
